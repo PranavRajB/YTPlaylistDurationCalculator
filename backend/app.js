@@ -5,9 +5,10 @@ const axios = require("axios");
 app.use(express.json());
 const cors = require("cors");
 const apiKey = process.env.API_KEY;
+console.log("API Key:", apiKey); // Debugging line to check if API key is loaded
 app.use(
   cors({
-    origin: "http://127.0.0.1:5173", // Replace with the URL of your frontend server
+    origin: "http://localhost:5173", // Replace with the URL of your frontend server
   })
 );
 
@@ -41,29 +42,45 @@ async function fetchPlaylistItems(playlistId) {
 
   return items;
 }
-async function fetchVideoDetails(videoId) {
-  const response = await axios.get(
-    `https://www.googleapis.com/youtube/v3/videos`,
-    {
-      params: {
-        part: "contentDetails",
-        id: videoId,
-        key: apiKey,
-      },
-    }
-  );
 
-  return response.data.items[0].contentDetails;
+async function fetchVideoDetails(videoId) {
+  try {
+    const response = await axios.get(
+      `https://www.googleapis.com/youtube/v3/videos`,
+      {
+        params: {
+          part: "contentDetails",
+          id: videoId,
+          key: apiKey,
+        },
+      }
+    );
+
+    const video = response.data.items[0];
+
+    if (!video || !video.contentDetails) {
+      console.warn("Video not found or no contentDetails:", videoId);
+      return { duration: "PT0S" }; // return 0 seconds for missing videos
+    }
+
+    return video.contentDetails;
+  } catch (err) {
+    console.error("Error fetching video details:", videoId, err.message);
+    return { duration: "PT0S" };
+  }
 }
 
 // Helper function to parse ISO 8601 duration format
 function parseDuration(duration) {
-  const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+  if (!duration) return 0;
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
   const hours = parseInt(match[1]) || 0;
   const minutes = parseInt(match[2]) || 0;
   const seconds = parseInt(match[3]) || 0;
   return hours * 3600 + minutes * 60 + seconds;
 }
+
 function secondsToHMS(duration) {
   const hours = Math.floor(duration / 3600);
   const minutes = Math.floor((duration % 3600) / 60);
@@ -84,9 +101,11 @@ app.post("/", async (req, res) => {
   const playlistId = extractPlaylistId(playlistLink);
   try {
     const items = await fetchPlaylistItems(playlistId);
-    const videoDetailsPromises = items.map((item) =>
-      fetchVideoDetails(item.contentDetails.videoId)
-    );
+    const videoDetailsPromises = items
+      .map((item) => item.contentDetails?.videoId) // optional chaining
+      .filter(Boolean) // remove undefined IDs
+      .map((videoId) => fetchVideoDetails(videoId));
+
     const videos = await Promise.all(videoDetailsPromises);
 
     // Calculate total duration and other statistics
