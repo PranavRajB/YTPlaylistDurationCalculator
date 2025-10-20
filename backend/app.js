@@ -1,9 +1,10 @@
 const express = require("express");
+require("dotenv").config();
 const app = express();
 const axios = require("axios");
 app.use(express.json());
 const cors = require("cors");
-const apiKey = "AIzaSyDtH0Qn2QEmhrcRy8K_MZRQTNSi0KZy4UY";
+const apiKey = process.env.API_KEY;
 app.use(
   cors({
     origin: "http://127.0.0.1:5173", // Replace with the URL of your frontend server
@@ -66,7 +67,7 @@ function parseDuration(duration) {
 function secondsToHMS(duration) {
   const hours = Math.floor(duration / 3600);
   const minutes = Math.floor((duration % 3600) / 60);
-  const seconds = duration % 60;
+  const seconds = Math.floor(duration % 60);
 
   return {
     hours: hours,
@@ -96,7 +97,7 @@ app.post("/", async (req, res) => {
     });
 
     const numberOfVideos = videos.length;
-    const averageDuration = totalDuration / numberOfVideos;
+    const averageDuration = Math.floor(totalDuration / numberOfVideos);
 
     // Convert totalDuration to a more readable format if necessary
     // ...
